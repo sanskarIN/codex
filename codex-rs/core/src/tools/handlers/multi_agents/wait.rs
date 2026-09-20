@@ -156,37 +156,46 @@ impl Handler {
             }
         }
 
-        let statuses = if !initial_final_statuses.is_empty() {
-            initial_final_statuses
-        } else {
-            let mut futures = FuturesUnordered::new();
-            for (id, rx) in status_rxs.into_iter() {
-                let session = session.clone();
-                futures.push(wait_for_final_status(session, id, rx));
+       let statuses = if !initial_final_statuses.is_empty() {
+    initial_final_statuses
+} else {
+    let mut futures = FuturesUnordered::new();
+    for (id, rx) in status_rxs.into_iter() {
+        let session = session.clone();
+        futures.push(wait_for_final_status(session, id, rx));
+    }
+
+    let mut results = Vec::new();
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms as u64);
+
+    loop {
+        match timeout_at(deadline, futures.next()).await {
+            Ok(Some(Some(result))) => {
+                results.push(result);
+                break;
             }
-            let mut results = Vec::new();
-            let deadline = Instant::now() + Duration::from_millis(timeout_ms as u64);
-            loop {
-                match timeout_at(deadline, futures.next()).await {
-                    Ok(Some(Some(result))) => {
-                        results.push(result);
-                        break;
-                    }
-                    Ok(Some(None)) => continue,
-                    Ok(None) | Err(_) => break,
-                }
+            Ok(Some(None)) => continue,
+            Ok(None) | Err(_) => break,
+        }
+    }
+
+    if !results.is_empty() {
+        loop {
+            match futures.next().now_or_never() {
+                Some(Some(Some(result))) => results.push(result),
+                Some(Some(None)) => continue,
+                Some(None) | None => break,
             }
-            if !results.is_empty() {
-                loop {
-                    match futures.next().now_or_never() {
-                        Some(Some(Some(result))) => results.push(result),
-                        Some(Some(None)) => continue,
-                        Some(None) | None => break,
-                    }
-                }
-            }
-            results
-        };
+        }
+    } else {
+        for id in &receiver_thread_ids {
+            let status = session.services.agent_control.get_status(*id).await;
+            results.push((*id, status));
+        }
+    }
+
+    results
+};
 
         let timed_out = statuses.is_empty();
         let statuses_by_id = statuses.clone().into_iter().collect::<HashMap<_, _>>();
