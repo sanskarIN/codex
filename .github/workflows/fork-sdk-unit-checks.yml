@@ -36,7 +36,7 @@ jobs:
         run: pnpm run build
       - name: Check TypeScript types
         working-directory: sdk/typescript
-        run: pnpm exec tsc --noEmit --rootDir . --pretty false
+        run: pnpm exec tsc --noEmit --rootDir . --allowImportingTsExtensions --pretty false
       - name: Lint TypeScript SDK
         working-directory: sdk/typescript
         run: pnpm run lint
