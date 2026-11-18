@@ -459,6 +459,15 @@ export function prependPathDirs(
   platform: NodeJS.Platform = process.platform,
 ): void {
   const pathKey = pathEnvKey(env, platform);
+  // On Windows the environment is case-insensitive, but a caller-provided JS
+  // object may contain both "PATH" and "Path". Preserve the preferred spelling
+  // without discarding a populated value when the preferred entry is empty.
+  let pathValue = env[pathKey];
+  if (platform === "win32" && !pathValue) {
+    pathValue = Object.entries(env).find(
+      ([key, value]) => key.toLowerCase() === "path" && value.length > 0,
+    )?.[1];
+  }
   if (platform === "win32") {
     for (const key of Object.keys(env)) {
       if (key.toLowerCase() === "path" && key !== pathKey) {
@@ -467,7 +476,7 @@ export function prependPathDirs(
     }
   }
 
-  const existingEntries = (env[pathKey] ?? "")
+  const existingEntries = (pathValue ?? "")
     .split(path.delimiter)
     .filter((entry) => entry.length > 0 && !pathDirs.includes(entry));
   env[pathKey] = [...pathDirs, ...existingEntries].join(path.delimiter);
