@@ -377,6 +377,12 @@ describe("CodexExec", () => {
       expectedValue: "C\\Tools",
     },
     {
+      name: "falls back to a nonstandard casing when Path is empty",
+      env: { PaTh: "C\\Tools", Path: "" },
+      expectedKey: "Path",
+      expectedValue: "C\\Tools",
+    },
+    {
       name: "preserves the existing Path priority when both entries have values",
       env: { PATH: "C\\Other", Path: "C\\Preferred" },
       expectedKey: "Path",
