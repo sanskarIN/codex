@@ -71,9 +71,11 @@ export class Thread {
     input: Input,
     turnOptions: TurnOptions = {},
   ): AsyncGenerator<ThreadEvent> {
+    // Validate the input before creating a temporary output-schema file.
+    // Otherwise invalid JavaScript input can leak the schema directory.
+    const { prompt, images } = normalizeInput(input);
     const { schemaPath, cleanup } = await createOutputSchemaFile(turnOptions.outputSchema);
     const options = this._threadOptions;
-    const { prompt, images } = normalizeInput(input);
     const generator = this._exec.run({
       input: prompt,
       baseUrl: this._options.baseUrl,
