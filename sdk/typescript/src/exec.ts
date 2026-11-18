@@ -169,7 +169,14 @@ export class CodexExec {
 
     if (args.images?.length) {
       for (const image of args.images) {
-        commandArgs.push("--image", image);
+        // The CLI reads image paths relative to the child process's cwd,
+        // which may differ from the configured Codex working directory.
+        const imagePath = path.isAbsolute(image)
+          ? image
+          : path.resolve(args.workingDirectory ?? process.cwd(), image);
+        // Use the single-argument form so filenames beginning with "-" are
+        // not treated as separate CLI flags.
+        commandArgs.push(`--image=${imagePath}`);
       }
     }
 
