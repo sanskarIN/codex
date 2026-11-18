@@ -43,6 +43,7 @@ export class Thread {
   private _options: CodexOptions;
   private _id: string | null;
   private _threadOptions: ThreadOptions;
+  private _turnInProgress = false;
 
   /** Returns the ID of the thread. Populated after the first turn starts. */
   public get id(): string | null {
@@ -71,30 +72,36 @@ export class Thread {
     input: Input,
     turnOptions: TurnOptions = {},
   ): AsyncGenerator<ThreadEvent> {
-    const { schemaPath, cleanup } = await createOutputSchemaFile(turnOptions.outputSchema);
-    const options = this._threadOptions;
-    const { prompt, images } = normalizeInput(input);
-    const generator = this._exec.run({
-      input: prompt,
-      baseUrl: this._options.baseUrl,
-      apiKey: this._options.apiKey,
-      threadId: this._id,
-      images,
-      model: options?.model,
-      threadSource: options?.threadSource,
-      sandboxMode: options?.sandboxMode,
-      workingDirectory: options?.workingDirectory,
-      skipGitRepoCheck: options?.skipGitRepoCheck,
-      outputSchemaFile: schemaPath,
-      modelReasoningEffort: options?.modelReasoningEffort,
-      signal: turnOptions.signal,
-      networkAccessEnabled: options?.networkAccessEnabled,
-      webSearchMode: options?.webSearchMode,
-      webSearchEnabled: options?.webSearchEnabled,
-      approvalPolicy: options?.approvalPolicy,
-      additionalDirectories: options?.additionalDirectories,
-    });
+    if (this._turnInProgress) {
+      throw new Error("A turn is already running on this thread");
+    }
+    this._turnInProgress = true;
+    let cleanup: (() => Promise<void>) | undefined;
     try {
+      const outputSchema = await createOutputSchemaFile(turnOptions.outputSchema);
+      cleanup = outputSchema.cleanup;
+      const options = this._threadOptions;
+      const { prompt, images } = normalizeInput(input);
+      const generator = this._exec.run({
+        input: prompt,
+        baseUrl: this._options.baseUrl,
+        apiKey: this._options.apiKey,
+        threadId: this._id,
+        images,
+        model: options?.model,
+        threadSource: options?.threadSource,
+        sandboxMode: options?.sandboxMode,
+        workingDirectory: options?.workingDirectory,
+        skipGitRepoCheck: options?.skipGitRepoCheck,
+        outputSchemaFile: outputSchema.schemaPath,
+        modelReasoningEffort: options?.modelReasoningEffort,
+        signal: turnOptions.signal,
+        networkAccessEnabled: options?.networkAccessEnabled,
+        webSearchMode: options?.webSearchMode,
+        webSearchEnabled: options?.webSearchEnabled,
+        approvalPolicy: options?.approvalPolicy,
+        additionalDirectories: options?.additionalDirectories,
+      });
       for await (const item of generator) {
         let parsed: ThreadEvent;
         try {
@@ -110,7 +117,11 @@ export class Thread {
         yield parsed;
       }
     } finally {
-      await cleanup();
+      try {
+        await cleanup?.();
+      } finally {
+        this._turnInProgress = false;
+      }
     }
   }
 
