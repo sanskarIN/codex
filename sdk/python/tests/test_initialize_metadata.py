@@ -58,3 +58,18 @@ def test_initialize_uses_user_agent_for_missing_server_version_only() -> None:
     assert result.serverInfo is not None
     assert result.serverInfo.name == "custom-server"
     assert result.serverInfo.version == "0.169.0"
+
+def test_initialize_raises_for_missing_version_after_parsing_user_agent() -> None:
+    metadata = InitializeResponse(userAgent="codex/")
+
+    with pytest.raises(RuntimeError, match="missing required metadata"):
+        validate_initialize_metadata(metadata)
+
+
+def test_initialize_uses_trimmed_version_from_user_agent() -> None:
+    metadata = InitializeResponse(userAgent="codex/   0.171.0-alpha.1 (Linux; x86_64)")
+
+    result = validate_initialize_metadata(metadata)
+
+    assert result.serverInfo is not None
+    assert result.serverInfo.version == "0.171.0-alpha.1"
