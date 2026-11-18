@@ -44,7 +44,7 @@ try {
   const esm = checkTypeScript("mts");
   assert.equal(esm.status, 0, `ESM import must typecheck: ${esm.stdout}${esm.stderr}`);
   assert.notEqual(commonJs.status, 0, "CommonJS imports must not typecheck as ESM-only");
-  assert.match(commonJs.stdout + commonJs.stderr, /@openai\\/codex-sdk/);
+  assert.match(commonJs.stdout + commonJs.stderr, /@openai\/codex-sdk/);
 
   const runtime = spawnSync(
     process.execPath,
