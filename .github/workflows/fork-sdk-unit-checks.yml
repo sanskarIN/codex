@@ -1,0 +1,92 @@
+# Fork-local SDK checks that do not require the upstream self-hosted Bazel runners.
+# These focused checks complement, but do not replace, full native CLI integration CI.
+name: Fork SDK unit checks
+
+on:
+  pull_request:
+    paths:
+      - "sdk/typescript/**"
+      - "sdk/python/**"
+      - ".github/workflows/fork-sdk-unit-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typescript-unit:
+    name: TypeScript SDK unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
+        with:
+          run_install: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Install SDK workspace dependencies
+        run: pnpm install --frozen-lockfile --filter @openai/codex-sdk...
+      - name: Build TypeScript SDK before checking sample imports
+        working-directory: sdk/typescript
+        run: pnpm run build
+      - name: Check TypeScript types
+        working-directory: sdk/typescript
+        run: pnpm exec tsc --noEmit --rootDir . --allowImportingTsExtensions --pretty false
+      - name: Lint TypeScript SDK
+        working-directory: sdk/typescript
+        run: pnpm run lint
+      - name: Execute SDK unit and regression tests
+        working-directory: sdk/typescript
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(tests/exec.test.ts)
+          for test in \
+            tests/objectValidation.test.ts \
+            tests/processErrors.test.ts \
+            tests/stderrTail.test.ts \
+            tests/outputSchemaCleanup.test.ts \
+            tests/threadConcurrency.test.ts; do
+            if [[ -f "$test" ]]; then
+              tests+=("$test")
+            fi
+          done
+          pnpm exec jest --runInBand "${tests[@]}"
+      - name: Validate ESM package export contract (when present)
+        working-directory: sdk/typescript
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f scripts/check-exports.cjs ]]; then
+            node scripts/check-exports.cjs
+          fi
+
+  python-metadata:
+    name: Python SDK metadata unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install minimal metadata test dependencies
+        run: python -m pip install "pydantic>=2.12,<3" "pytest>=8,<10" "packaging>=26,<27"
+      - name: Test metadata normalization (when present)
+        shell: bash
+        env:
+          PYTHONPATH: sdk/python/src
+        run: |
+          set -euo pipefail
+          if [[ -f sdk/python/tests/test_initialize_metadata.py ]]; then
+            python -m pytest -q sdk/python/tests/test_initialize_metadata.py
+          else
+            echo "No metadata regression test present on this branch"
+          fi
