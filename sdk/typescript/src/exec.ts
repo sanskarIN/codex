@@ -274,7 +274,7 @@ export class CodexExec {
       if (code !== 0 || signal) {
         const stderrBuffer = Buffer.concat(stderrChunks, stderrBytes);
         const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`;
-        const prefix = stderrTruncated ? "[earlier stderr output truncated]\\n" : "";
+        const prefix = stderrTruncated ? "[earlier stderr output truncated]\n" : "";
         throw new Error(
           `Codex Exec exited with ${detail}: ${prefix}${stderrBuffer.toString("utf8")}`,
         );
