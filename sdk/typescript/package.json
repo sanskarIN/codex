@@ -39,7 +39,7 @@
     "build:watch": "tsup --watch",
     "lint": "pnpm eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "pnpm eslint --fix \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "test": "jest",
+    "test": "jest && node scripts/check-exports.cjs",
     "test:watch": "jest --watch",
     "coverage": "jest --coverage",
     "format": "prettier --check .",
