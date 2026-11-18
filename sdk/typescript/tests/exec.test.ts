@@ -362,6 +362,7 @@ describe("CodexExec", () => {
 
     expect(env).toEqual({ Path: `${pathDir}${path.delimiter}C\\Windows` });
   });
+
   it.each([
     {
       name: "prefers a populated PATH value over an empty Path value",
@@ -391,5 +392,4 @@ describe("CodexExec", () => {
     expect(Object.keys(entries)).toEqual([expectedKey]);
     expect(entries[expectedKey]).toBe(`${vendor}${path.delimiter}${expectedValue}`);
   });
-
 });
