@@ -73,6 +73,56 @@ describe("CodexExec", () => {
     }
   });
 
+  it("preserves Unicode U+2028 and U+2029 inside LF-delimited JSON events", async () => {
+    const { CodexExec } = await import("../src/exec");
+    spawnMock.mockClear();
+    const child = new FakeChildProcess();
+    spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+
+    const record = JSON.stringify({ type: "example", text: "before\u2028middle\u2029after" });
+    const bytes = Buffer.from(`${record}\r\n`, "utf8");
+    const splitPoint = bytes.indexOf(Buffer.from("\u2028", "utf8")) + 1;
+
+    setImmediate(() => {
+      // Deliberately divide the UTF-8 encoding in the middle of U+2028.
+      child.stdout.write(bytes.subarray(0, splitPoint));
+      child.stdout.end(bytes.subarray(splitPoint));
+      child.stderr.end();
+      child.emit("exit", 0, null);
+    });
+
+    const lines: string[] = [];
+    for await (const line of new CodexExec("codex").run({ input: "test" })) {
+      lines.push(line);
+    }
+
+    expect(lines).toEqual([record]);
+    expect(JSON.parse(lines[0]!)).toEqual({
+      type: "example",
+      text: "before\u2028middle\u2029after",
+    });
+  });
+
+  it("emits a final unterminated JSONL record at EOF", async () => {
+    const { CodexExec } = await import("../src/exec");
+    spawnMock.mockClear();
+    const child = new FakeChildProcess();
+    spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+
+    setImmediate(() => {
+      child.stdout.write('{"first":true}\n');
+      child.stdout.end('{"last":true}');
+      child.stderr.end();
+      child.emit("exit", 0, null);
+    });
+
+    const lines: string[] = [];
+    for await (const line of new CodexExec("codex").run({ input: "test" })) {
+      lines.push(line);
+    }
+    expect(lines).toEqual(['{"first":true}', '{"last":true}']);
+  });
+
   it("places resume args before image args", async () => {
     const { CodexExec } = await import("../src/exec");
     spawnMock.mockClear();
