@@ -1,11 +1,14 @@
 // Validate the packaged SDK export conditions without downloading a Codex CLI binary.
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
-const { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require("node:fs");
+const { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } =
+  require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
-const manifest = JSON.parse(readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+const manifest = JSON.parse(
+  readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+);
 const tsc = require.resolve("typescript/bin/tsc");
 const root = mkdtempSync(path.join(tmpdir(), "codex-esm-exports-"));
 
@@ -16,8 +19,14 @@ try {
     path.join(sdkDir, "package.json"),
     JSON.stringify({ name: manifest.name, type: manifest.type, exports: manifest.exports }),
   );
-  writeFileSync(path.join(sdkDir, "dist", "index.d.ts"), "export declare class Codex {}\n");
-  writeFileSync(path.join(sdkDir, "dist", "index.js"), "export class Codex {}\n");
+  writeFileSync(
+    path.join(sdkDir, "dist", "index.d.ts"),
+    "export declare class Codex {}\n",
+  );
+  writeFileSync(
+    path.join(sdkDir, "dist", "index.js"),
+    "export class Codex {}\n",
+  );
   const importer = 'import { Codex } from "@openai/codex-sdk"; console.log(Codex);\n';
   for (const ext of ["cts", "mts"]) {
     writeFileSync(path.join(root, `repro.${ext}`), importer);
@@ -42,8 +51,16 @@ try {
   }
   const commonJs = checkTypeScript("cts");
   const esm = checkTypeScript("mts");
-  assert.equal(esm.status, 0, `ESM import must typecheck: ${esm.stdout}${esm.stderr}`);
-  assert.notEqual(commonJs.status, 0, "CommonJS imports must not typecheck as ESM-only");
+  assert.equal(
+    esm.status,
+    0,
+    `ESM import must typecheck: ${esm.stdout}${esm.stderr}`,
+  );
+  assert.notEqual(
+    commonJs.status,
+    0,
+    "CommonJS imports must not typecheck as ESM-only",
+  );
   assert.match(commonJs.stdout + commonJs.stderr, /@openai\/codex-sdk/);
 
   const runtime = spawnSync(
@@ -60,7 +77,9 @@ try {
     0,
     `ESM runtime import must succeed: ${runtime.stdout}${runtime.stderr}`,
   );
-  console.log("Package exports validated for ESM and CommonJS TypeScript consumers");
+  console.log(
+    "Package exports validated for ESM and CommonJS TypeScript consumers",
+  );
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
