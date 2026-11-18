@@ -96,6 +96,44 @@ describe("Thread turn concurrency", () => {
     expect(controlled.calls()).toBe(2);
   });
 
+  it("releases the guard after the executor fails", async () => {
+    let calls = 0;
+    const exec = {
+      async *run(): AsyncGenerator<string> {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error("synthetic execution failure");
+        }
+        yield JSON.stringify({ type: "thread.started", thread_id: "recovered-thread" });
+        yield JSON.stringify({
+          type: "turn.completed",
+          usage: {
+            input_tokens: 0,
+            cached_input_tokens: 0,
+            output_tokens: 0,
+            reasoning_output_tokens: 0,
+          },
+        });
+      },
+    } as unknown as CodexExec;
+    const thread = new Thread(exec, {}, {});
+
+    await expect(thread.run("fails")).rejects.toThrow("synthetic execution failure");
+    await expect(thread.run("recovers")).resolves.toMatchObject({ items: [] });
+    expect(calls).toBe(2);
+  });
+
+  it("releases the guard when a streamed event iterator closes early", async () => {
+    const controlled = createControlledExec();
+    const thread = new Thread(controlled.exec, {}, {});
+    const streaming = await thread.runStreamed("first");
+    await streaming.events.next();
+    await streaming.events.return(undefined);
+
+    await expect(thread.run("after cancellation")).resolves.toBeDefined();
+    expect(controlled.calls()).toBe(2);
+  });
+
   it("releases the guard after a setup error", async () => {
     const controlled = createControlledExec();
     const thread = new Thread(controlled.exec, {}, {});
