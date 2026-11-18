@@ -93,9 +93,10 @@ describe("CodexExec", () => {
     const commandArgs = spawnMock.mock.calls[0]?.[1] as string[] | undefined;
     expect(commandArgs).toBeDefined();
     const resumeIndex = commandArgs!.indexOf("resume");
-    const imageIndex = commandArgs!.indexOf("--image");
+    const imageIndex = commandArgs!.findIndex((arg) => arg.startsWith("--image="));
     expect(resumeIndex).toBeGreaterThan(-1);
     expect(imageIndex).toBeGreaterThan(-1);
+    expect(commandArgs![imageIndex]).toBe(`--image=${path.resolve("img.png")}`);
     expect(resumeIndex).toBeLessThan(imageIndex);
   });
 
@@ -259,6 +260,47 @@ describe("CodexExec", () => {
       "resume",
       "thread-id",
     ]);
+  });
+
+  it.each([
+    {
+      name: "dash-prefixed relative filename",
+      image: "-sample.png",
+      workingDirectory: path.join(tmpdir(), "workspace"),
+      expected: path.join(tmpdir(), "workspace", "-sample.png"),
+    },
+    {
+      name: "relative subdirectory image",
+      image: path.join("assets", "photo.png"),
+      workingDirectory: path.join(tmpdir(), "workspace"),
+      expected: path.join(tmpdir(), "workspace", "assets", "photo.png"),
+    },
+    {
+      name: "absolute image path",
+      image: path.join(tmpdir(), "outside.png"),
+      workingDirectory: path.join(tmpdir(), "workspace"),
+      expected: path.join(tmpdir(), "outside.png"),
+    },
+  ])("passes $name as one image argument", async ({ image, workingDirectory, expected }) => {
+    const { CodexExec } = await import("../src/exec");
+    spawnMock.mockClear();
+    const child = new FakeChildProcess();
+    spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+
+    setImmediate(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit("exit", 0, null);
+    });
+
+    const exec = new CodexExec("codex");
+    for await (const _line of exec.run({ input: "describe", images: [image], workingDirectory })) {
+      // no-op
+    }
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args).toContain(`--image=${expected}`);
+    expect(args.filter((arg) => arg.startsWith("--image"))).toEqual([`--image=${expected}`]);
   });
 
   it("allows overriding the env passed to the Codex CLI", async () => {
