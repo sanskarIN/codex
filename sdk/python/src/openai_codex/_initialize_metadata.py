@@ -11,7 +11,8 @@ def _split_user_agent(user_agent: str) -> tuple[str | None, str | None]:
         name, version_and_details = raw.split("/", 1)
         # A user agent may include platform/terminal details after the version;
         # serverInfo.version should contain only the version token.
-        version = version_and_details.strip().split(maxsplit=1)[0] if version_and_details.strip() else None
+        details = version_and_details.strip()
+        version = details.split(maxsplit=1)[0] if details else None
         return (name or None), version
     parts = raw.split(maxsplit=1)
     if len(parts) == 2:
