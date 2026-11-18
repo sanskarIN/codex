@@ -23,8 +23,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "files": [
@@ -37,7 +39,7 @@
     "build:watch": "tsup --watch",
     "lint": "pnpm eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "pnpm eslint --fix \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "test": "jest",
+    "test": "jest && node scripts/check-exports.cjs",
     "test:watch": "jest --watch",
     "coverage": "jest --coverage",
     "format": "prettier --check .",
