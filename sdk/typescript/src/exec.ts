@@ -45,6 +45,7 @@ export type CodexExecArgs = {
 const INTERNAL_ORIGINATOR_ENV = "CODEX_INTERNAL_ORIGINATOR_OVERRIDE";
 const TYPESCRIPT_SDK_ORIGINATOR = "codex_sdk_ts";
 const CODEX_NPM_NAME = "@openai/codex";
+const MAX_STDERR_BYTES = 1024 * 1024;
 
 const PLATFORM_PACKAGE_BY_TARGET: Record<string, string> = {
   "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
@@ -212,11 +213,40 @@ export class CodexExec {
       child.kill();
       throw new Error("Child process has no stdout");
     }
+    // Keep only recent diagnostics. The pipe must still be drained even when
+    // stderr is extremely verbose, or the child may block on backpressure.
     const stderrChunks: Buffer[] = [];
+    let stderrBytes = 0;
+    let stderrTruncated = false;
 
     if (child.stderr) {
-      child.stderr.on("data", (data) => {
-        stderrChunks.push(data);
+      child.stderr.on("data", (data: Buffer | string) => {
+        const original = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        // Copy oversized chunks so a small slice cannot retain a huge backing buffer.
+        const chunk =
+          original.length > MAX_STDERR_BYTES
+            ? Buffer.from(original.subarray(original.length - MAX_STDERR_BYTES))
+            : original;
+        if (chunk.length !== original.length) {
+          stderrChunks.length = 0;
+          stderrBytes = 0;
+          stderrTruncated = true;
+        }
+        stderrChunks.push(chunk);
+        stderrBytes += chunk.length;
+
+        while (stderrBytes > MAX_STDERR_BYTES) {
+          const oldest = stderrChunks[0];
+          const overflow = stderrBytes - MAX_STDERR_BYTES;
+          if (oldest.length <= overflow) {
+            stderrChunks.shift();
+            stderrBytes -= oldest.length;
+          } else {
+            stderrChunks[0] = oldest.subarray(overflow);
+            stderrBytes -= overflow;
+          }
+          stderrTruncated = true;
+        }
       });
     }
 
@@ -242,9 +272,12 @@ export class CodexExec {
       if (spawnError) throw spawnError;
       const { code, signal } = await exitPromise;
       if (code !== 0 || signal) {
-        const stderrBuffer = Buffer.concat(stderrChunks);
+        const stderrBuffer = Buffer.concat(stderrChunks, stderrBytes);
         const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`;
-        throw new Error(`Codex Exec exited with ${detail}: ${stderrBuffer.toString("utf8")}`);
+        const prefix = stderrTruncated ? "[earlier stderr output truncated]\\n" : "";
+        throw new Error(
+          `Codex Exec exited with ${detail}: ${prefix}${stderrBuffer.toString("utf8")}`,
+        );
       }
     } finally {
       rl.close();
