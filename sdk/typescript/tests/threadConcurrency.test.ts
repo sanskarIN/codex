@@ -89,8 +89,8 @@ describe("Thread turn concurrency", () => {
       controlled.finishFirst();
     }
 
-    for await (const _event of first.events) {
-      // Finish the first streamed turn so the thread is available again.
+    for await (const event of first.events) {
+      expect(event.type).toBe("turn.completed");
     }
     await expect(thread.run("after completion")).resolves.toBeDefined();
     expect(controlled.calls()).toBe(2);
