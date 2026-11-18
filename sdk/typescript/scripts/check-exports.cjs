@@ -77,6 +77,23 @@ try {
     0,
     `ESM runtime import must succeed: ${runtime.stdout}${runtime.stderr}`,
   );
+  // CommonJS should fail as an unsupported package export, not appear
+  // importable to TypeScript and then crash unexpectedly at runtime.
+  const commonJsRuntime = spawnSync(
+    process.execPath,
+    ["-e", 'require("@openai/codex-sdk")'],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.notEqual(
+    commonJsRuntime.status,
+    0,
+    "CommonJS require must not import an ESM-only SDK",
+  );
+  assert.match(
+    commonJsRuntime.stderr,
+    /ERR_PACKAGE_PATH_NOT_EXPORTED/,
+  );
+
   console.log(
     "Package exports validated for ESM and CommonJS TypeScript consumers",
   );
