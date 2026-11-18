@@ -199,14 +199,29 @@ export class CodexExec {
     });
 
     let spawnError: unknown | null = null;
-    child.once("error", (err) => (spawnError = err));
+    const onChildError = (err: Error) => {
+      spawnError = err;
+    };
+    // Keep the error listener until close, even if the caller stops streaming early.
+    // AbortSignal can emit a child error after a generator is closed.
+    child.on("error", onChildError);
+    child.once("close", () => child.removeListener("error", onChildError));
 
     if (!child.stdin) {
       child.kill();
       throw new Error("Child process has no stdin");
     }
-    child.stdin.write(args.input);
-    child.stdin.end();
+    let stdinError: Error | null = null;
+    const stdin = child.stdin;
+    const onStdinError = (err: Error) => {
+      stdinError = err;
+    };
+    // Early CLI exit can close stdin while a large prompt is still being written.
+    // Handle EPIPE/EOF here, rather than crashing the SDK caller.
+    stdin.on("error", onStdinError);
+    child.once("close", () => stdin.removeListener("error", onStdinError));
+    stdin.write(args.input);
+    stdin.end();
 
     if (!child.stdout) {
       child.kill();
@@ -246,9 +261,11 @@ export class CodexExec {
         const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`;
         throw new Error(`Codex Exec exited with ${detail}: ${stderrBuffer.toString("utf8")}`);
       }
+      if (stdinError) {
+        throw stdinError;
+      }
     } finally {
       rl.close();
-      child.removeAllListeners();
       try {
         if (!child.killed) child.kill();
       } catch {
