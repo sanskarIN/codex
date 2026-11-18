@@ -12,6 +12,13 @@ npm install @openai/codex-sdk
 
 Requires Node.js 18+.
 
+The SDK is an **ES module** package. Use a native ESM project (`"type": "module"`
+in `package.json`, or `.mts` when using TypeScript with `module: "NodeNext"`).
+CommonJS `require("@openai/codex-sdk")` is not supported. The package's
+TypeScript export conditions are scoped to ESM imports so CommonJS consumers
+receive a compile-time resolution error instead of a runtime
+`ERR_PACKAGE_PATH_NOT_EXPORTED`.
+
 ## Quickstart
 
 ```typescript
