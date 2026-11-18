@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
 import { describe, expect, it } from "@jest/globals";
-import { CodexExec } from "../src/exec";
+import type { CodexExec } from "../src/exec";
 
 jest.mock("node:child_process", () => {
   const actual = jest.requireActual<typeof import("node:child_process")>("node:child_process");
@@ -34,6 +34,7 @@ describe("CodexExec subprocess error handling", () => {
   it("returns the CLI diagnostic instead of crashing on early stdin EPIPE", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+    const { CodexExec } = await import("../src/exec");
     const result = drain(new CodexExec("codex"));
 
     setImmediate(() => {
@@ -51,6 +52,7 @@ describe("CodexExec subprocess error handling", () => {
   it("rejects with a stdin write error when the child otherwise exits cleanly", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+    const { CodexExec } = await import("../src/exec");
     const result = drain(new CodexExec("codex"));
 
     setImmediate(() => {
@@ -67,6 +69,7 @@ describe("CodexExec subprocess error handling", () => {
   it("keeps a child error listener until close after iterator cancellation", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
+    const { CodexExec } = await import("../src/exec");
     const iterator = new CodexExec("codex").run({ input: "hello" });
 
     const first = iterator.next();
