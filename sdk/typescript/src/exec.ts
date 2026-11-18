@@ -236,7 +236,7 @@ export class CodexExec {
         stderrBytes += chunk.length;
 
         while (stderrBytes > MAX_STDERR_BYTES) {
-          const oldest = stderrChunks[0];
+          const oldest = stderrChunks[0]!;
           const overflow = stderrBytes - MAX_STDERR_BYTES;
           if (oldest.length <= overflow) {
             stderrChunks.shift();
