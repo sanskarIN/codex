@@ -343,7 +343,11 @@ function formatTomlKey(key: string): string {
 }
 
 function isPlainObject(value: unknown): value is CodexConfigObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 function findCodexPath(): CodexPathResolution {
