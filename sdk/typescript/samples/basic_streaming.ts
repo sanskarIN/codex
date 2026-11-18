@@ -30,6 +30,21 @@ const handleItemCompleted = (item: ThreadItem): void => {
       }
       break;
     }
+    case "web_search":
+      console.log(`Web search: ${item.query}`);
+      break;
+    case "mcp_tool_call":
+      console.log(`MCP tool ${item.server}/${item.tool}: ${item.status}`);
+      if (item.error) {
+        console.error(`MCP tool error: ${item.error.message}`);
+      }
+      break;
+    case "error":
+      console.error(`Item error: ${item.message}`);
+      break;
+    case "todo_list":
+      handleItemUpdated(item);
+      break;
   }
 };
 
