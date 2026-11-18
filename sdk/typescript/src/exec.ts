@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
 import { statSync } from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
 import { createRequire } from "node:module";
 
 import type { CodexConfigObject, CodexConfigValue } from "./codexOptions";
@@ -228,15 +227,27 @@ export class CodexExec {
       },
     );
 
-    const rl = readline.createInterface({
-      input: child.stdout,
-      crlfDelay: Infinity,
-    });
+    // JSONL records are delimited by LF only. readline also considers U+2028
+    // and U+2029 line separators on some supported Node versions, which can
+    // split valid JSON strings into invalid partial events.
+    child.stdout.setEncoding("utf8");
+    let pending = "";
 
     try {
-      for await (const line of rl) {
-        // `line` is a string (Node sets default encoding to utf8 for readline)
-        yield line as string;
+      for await (const chunk of child.stdout) {
+        pending += chunk as string;
+        let newlineIndex = pending.indexOf("\n");
+        while (newlineIndex >= 0) {
+          const line = pending.slice(0, newlineIndex);
+          // Accept CRLF records while preserving other Unicode separators.
+          yield line.endsWith("\r") ? line.slice(0, -1) : line;
+          pending = pending.slice(newlineIndex + 1);
+          newlineIndex = pending.indexOf("\n");
+        }
+      }
+      // Do not silently discard an otherwise valid final JSONL record.
+      if (pending.length > 0) {
+        yield pending;
       }
 
       if (spawnError) throw spawnError;
@@ -247,7 +258,6 @@ export class CodexExec {
         throw new Error(`Codex Exec exited with ${detail}: ${stderrBuffer.toString("utf8")}`);
       }
     } finally {
-      rl.close();
       child.removeAllListeners();
       try {
         if (!child.killed) child.kill();
