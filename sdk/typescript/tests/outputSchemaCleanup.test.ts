@@ -41,6 +41,21 @@ describe("output schema temp-directory cleanup", () => {
     }
   });
 
+  it("does not allocate schema files for invalid streamed input", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "codex-output-cleanup-test-"));
+    const tmpdirSpy = jest.spyOn(os, "tmpdir").mockReturnValue(root);
+    try {
+      const streamed = await testThread().runStreamed(null as unknown as Input, {
+        outputSchema: { type: "object" },
+      });
+      await expect(streamed.events.next()).rejects.toThrow();
+      expect(await readdir(root)).toEqual([]);
+    } finally {
+      tmpdirSpy.mockRestore();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("cleans a valid streamed turn's temporary output schema", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "codex-output-cleanup-test-"));
     const tmpdirSpy = jest.spyOn(os, "tmpdir").mockReturnValue(root);
