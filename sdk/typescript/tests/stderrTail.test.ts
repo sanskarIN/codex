@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
 import { describe, expect, it } from "@jest/globals";
-import { CodexExec } from "../src/exec";
+import type { CodexExec } from "../src/exec";
 
 jest.mock("node:child_process", () => {
   const actual = jest.requireActual<typeof import("node:child_process")>("node:child_process");
@@ -24,8 +24,7 @@ class TestChild extends EventEmitter {
   }
 }
 
-async function consume(): Promise<void> {
-  const exec = new CodexExec("codex");
+async function consume(exec: CodexExec): Promise<void> {
   for await (const _line of exec.run({ input: "prompt" })) {
     // Consume output until the synthetic process exits.
   }
@@ -35,7 +34,8 @@ describe("CodexExec stderr retention", () => {
   it("keeps only the newest 1 MiB when stderr exceeds the limit", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
-    const result = consume();
+    const { CodexExec } = await import("../src/exec");
+    const result = consume(new CodexExec("codex"));
 
     setImmediate(() => {
       child.stderr.write(Buffer.alloc(3 * 1024 * 1024, "x"));
@@ -61,7 +61,8 @@ describe("CodexExec stderr retention", () => {
   it("preserves short failures without a truncation marker", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
-    const result = consume();
+    const { CodexExec } = await import("../src/exec");
+    const result = consume(new CodexExec("codex"));
 
     setImmediate(() => {
       child.stderr.write("configuration invalid");
@@ -76,7 +77,8 @@ describe("CodexExec stderr retention", () => {
   it("drains a verbose successful process without treating stderr as a failure", async () => {
     const child = new TestChild();
     spawnMock.mockReturnValue(child as unknown as child_process.ChildProcess);
-    const result = consume();
+    const { CodexExec } = await import("../src/exec");
+    const result = consume(new CodexExec("codex"));
 
     setImmediate(() => {
       for (let i = 0; i < 64; i++) {
