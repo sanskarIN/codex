@@ -362,4 +362,34 @@ describe("CodexExec", () => {
 
     expect(env).toEqual({ Path: `${pathDir}${path.delimiter}C\\Windows` });
   });
+  it.each([
+    {
+      name: "prefers a populated PATH value over an empty Path value",
+      env: { PATH: `C\\Windows${path.delimiter}C\\Tools`, Path: "" },
+      expectedKey: "Path",
+      expectedValue: `C\\Windows${path.delimiter}C\\Tools`,
+    },
+    {
+      name: "retains a populated PATH when a lowercase path is empty",
+      env: { PATH: "C\\Tools", path: "" },
+      expectedKey: "path",
+      expectedValue: "C\\Tools",
+    },
+    {
+      name: "preserves the existing Path priority when both entries have values",
+      env: { PATH: "C\\Other", Path: "C\\Preferred" },
+      expectedKey: "Path",
+      expectedValue: "C\\Preferred",
+    },
+  ])("$name", async ({ env, expectedKey, expectedValue }) => {
+    const { prependPathDirs } = await import("../src/exec");
+    const entries: Record<string, string> = { ...env };
+    const vendor = "C\\Vendor";
+
+    prependPathDirs(entries, [vendor], "win32");
+
+    expect(Object.keys(entries)).toEqual([expectedKey]);
+    expect(entries[expectedKey]).toBe(`${vendor}${path.delimiter}${expectedValue}`);
+  });
+
 });
